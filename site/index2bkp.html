@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Urban iA</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Roboto',sans-serif;background:#000;color:#fff;min-height:100vh;overflow:hidden;position:relative}
+        .stars{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+        .star{position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;animation:twinkle 3s infinite}
+        @keyframes twinkle{0%,100%{opacity:.3}50%{opacity:1}}
+        .black-hole{position:fixed;top:-200px;right:-200px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,transparent 30%,rgba(255,140,0,.1) 50%,rgba(255,200,50,.05) 70%);animation:rotate 60s linear infinite;pointer-events:none;z-index:0;opacity:.3}
+        @keyframes rotate{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+        .container{display:flex;height:100vh;position:relative;z-index:1}
+        header{position:absolute;top:20px;left:50%;transform:translateX(-50%);text-align:center;z-index:1000;background:rgba(10,10,30,.9);padding:15px 40px;border-radius:15px;border:1px solid rgba(255,140,0,.3);backdrop-filter:blur(10px)}
+        h1{font-family:'Orbitron',sans-serif;font-size:2em;text-shadow:0 0 20px rgba(255,140,0,.8);letter-spacing:3px;font-weight:900;color:#ffa500}
+        .subtitle{font-size:.9em;opacity:.8;color:#ffa500;font-weight:300;letter-spacing:2px;margin-top:5px}
+        .sidebar{width:350px;background:rgba(10,10,30,.95);border-right:2px solid rgba(255,140,0,.3);overflow-y:auto;padding:120px 20px 20px 20px;backdrop-filter:blur(10px);box-shadow:0 0 40px rgba(255,140,0,.2)}
+        .sidebar::-webkit-scrollbar{width:8px}
+        .sidebar::-webkit-scrollbar-track{background:rgba(255,140,0,.1)}
+        .sidebar::-webkit-scrollbar-thumb{background:rgba(255,140,0,.5);border-radius:4px}
+        .map-container{flex:1;position:relative}
+        #map{width:100%;height:100%}
+        .layer-group{margin-bottom:25px;background:rgba(255,140,0,.05);border:1px solid rgba(255,140,0,.3);border-radius:12px;padding:15px;transition:all .3s ease}
+        .layer-group:hover{background:rgba(255,140,0,.1);box-shadow:0 0 20px rgba(255,140,0,.3)}
+        .layer-group h3{font-family:'Orbitron',sans-serif;color:#ffa500;margin-bottom:15px;font-size:1.1em;text-transform:uppercase;letter-spacing:2px;display:flex;align-items:center;gap:10px}
+        .layer-item{display:flex;align-items:center;padding:10px;margin:8px 0;background:rgba(0,0,0,.3);border-radius:8px;transition:all .3s ease;cursor:pointer}
+        .layer-item:hover{background:rgba(255,140,0,.2);transform:translateX(5px)}
+        .layer-checkbox{width:20px;height:20px;margin-right:12px;cursor:pointer;accent-color:#ffa500}
+        .layer-label{flex:1;font-size:.95em;cursor:pointer}
+        .layer-opacity{width:60px;margin-left:10px;accent-color:#ffa500}
+        .controls-panel{position:absolute;bottom:30px;right:30px;background:rgba(10,10,30,.95);border:2px solid rgba(255,140,0,.3);border-radius:15px;padding:20px;z-index:1000;backdrop-filter:blur(10px);box-shadow:0 0 40px rgba(255,140,0,.3)}
+        .control-button{display:block;width:100%;padding:12px 20px;margin:8px 0;background:linear-gradient(135deg,rgba(255,140,0,.3),rgba(255,200,50,.3));border:2px solid #ffa500;border-radius:10px;color:#fff;font-family:'Orbitron',sans-serif;font-size:.9em;cursor:pointer;transition:all .3s ease;text-transform:uppercase;letter-spacing:1px}
+        .control-button:hover{transform:scale(1.05);box-shadow:0 0 25px rgba(255,140,0,.6);background:linear-gradient(135deg,rgba(255,140,0,.5),rgba(255,200,50,.5))}
+        .legend-panel{position:absolute;top:120px;right:30px;max-width:300px;background:rgba(10,10,30,.95);border:2px solid rgba(255,140,0,.3);border-radius:15px;padding:20px;z-index:1000;backdrop-filter:blur(10px);box-shadow:0 0 40px rgba(255,140,0,.3);max-height:60vh;overflow-y:auto;display:none}
+        .legend-panel.active{display:block}
+        .legend-panel h4{font-family:'Orbitron',sans-serif;color:#ffa500;margin-bottom:15px;text-transform:uppercase;letter-spacing:2px}
+        .legend-item{display:flex;align-items:center;margin:10px 0;font-size:.9em;gap:10px}
+        .legend-color{width:30px;height:20px;border-radius:4px;border:1px solid rgba(255,140,0,.3)}
+    .info-badge{background:rgba(255,140,0,.2);color:#ffa500;padding:4px 8px;border-radius:6px;font-size:.75em;margin-left:auto;font-family:'Orbitron',sans-serif;display:none}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+        .sidebar,header{animation:fadeIn 1s ease-out}
+        .loading-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(10,10,30,.95);padding:30px;border-radius:15px;border:2px solid rgba(255,140,0,.5);z-index:2000;display:none}
+        .loading-indicator.active{display:block}
+        .loading-text{font-family:'Orbitron',sans-serif;color:#ffa500;font-size:1.2em;text-align:center}
+        .spinner{width:50px;height:50px;border:4px solid rgba(255,140,0,.3);border-top-color:#ffa500;border-radius:50%;animation:spin 1s linear infinite;margin:20px auto}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .legend-img{max-width:100%;background:#111;border-radius:8px;border:1px solid rgba(255,140,0,.2);padding:6px}
+        .small{opacity:.7;font-size:.85em}
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+    <div class="black-hole"></div>
+
+    <div class="container">
+        <header>
+            <h1>🌍 UrbaniA</h1>
+            <p class="subtitle">SISTEMA DE ANÁLISE AMBIENTAL</p>
+        </header>
+
+        <div class="sidebar">
+            <!-- Ocupação do Solo removida conforme solicitado -->
+
+            <div class="layer-group">
+                <h3>💧 Recursos Hídricos</h3>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="balanco_hidrico" data-layer="balanco_hidrico">
+                    <label class="layer-label" for="balanco_hidrico">Balanço Hídrico</label>
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="captacao_agua" data-layer="captacao_agua">
+                    <label class="layer-label" for="captacao_agua">Pontos de Captação</label>
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="drenagem" data-layer="drenagem">
+                    <label class="layer-label" for="drenagem">Rede de Drenagem</label>
+                </div>
+            </div>
+
+            <div class="layer-group">
+                <h3>🌍 Meteomatics API</h3>
+                                  
+                <button class="control-button" id="elevToggleBtn" onclick="toggleElevationTool()">Elevação (SRTM)</button>
+
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="elevToggleBtn" data-layer="elevation_mm" data-source="meteomatics">
+                    <label class="layer-label" for="elevation_mm">Elevação (NASA SRTM)</label>
+                    <span class="info-badge">API</span>
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="land_usage_mm" data-layer="land_usage_mm" data-source="meteomatics">
+                    <label class="layer-label" for="land_usage_mm">Uso do Solo (Corine)</label>
+                    <span class="info-badge">API</span>
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="roughness_mm" data-layer="roughness_mm" data-source="meteomatics">
+                    <label class="layer-label" for="roughness_mm">Elevação do Terreno</label>
+                    <span class="info-badge">API</span>
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="water_body_mm" data-layer="water_body_mm" data-source="meteomatics">
+                    <label class="layer-label" for="water_body_mm">Corpos d'Água</label>
+                    <span class="info-badge">API</span>
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="shadow_mm" data-layer="shadow_mm" data-source="meteomatics">
+                    <label class="layer-label" for="shadow_mm">Sombra Topográfica</label>
+                    <span class="info-badge">API</span>
+                </div>
+            </div>
+
+            <!-- Topografia removida conforme solicitado -->
+
+            <!-- Solo e Bioma removidos conforme solicitado -->
+
+            <div class="layer-group">
+                <h3>🛡️ Conservação</h3>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="unid_conservacao" data-layer="unid_conservacao">
+                    <label class="layer-label" for="unid_conservacao">Unidades de Conservação</label>
+                </div>
+            </div>
+
+            <div class="layer-group">
+                <h3>📐 Zoneamento</h3>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="zona_municipal" data-layer="zona_municipal">
+                    <label class="layer-label" for="zona_municipal">Municipal</label>
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="zona_estadual" data-layer="zona_estadual">
+                    <label class="layer-label" for="zona_estadual">Estadual</label>
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" class="layer-checkbox" id="zona_federal" data-layer="zona_federal">
+                    <label class="layer-label" for="zona_federal">Federal</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        <div class="controls-panel">
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <input id="citySearchInput" placeholder="Pesquisar cidade..." aria-label="Pesquisar cidade" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,140,0,.15);background:#0b0b0b;color:#fff;outline:none"/>
+                <button id="citySearchBtn" class="control-button" style="width:48px;padding:8px;margin:0;">🔎</button>
+            </div>
+            <div id="searchResults" style="max-height:180px;overflow:auto;margin-bottom:8px"></div>
+            <button class="control-button" onclick="toggleLegend()">📋 Legenda</button>
+            <button class="control-button" onclick="resetView()">🔄 Reset View</button>
+            <button class="control-button" id="elevToggleBtn" onclick="toggleElevationTool()">📍 Elevação (SRTM)</button>
+        </div>
+
+        <div class="legend-panel" id="legendPanel">
+            <h4>📋 Legendas Ativas</h4>
+            <div id="legendContent">
+                <p style="opacity:.6;text-align:center;">Ative camadas para ver as legendas</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-indicator" id="loadingIndicator">
+        <div class="spinner"></div>
+        <div class="loading-text">CARREGANDO DADOS...</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+        // Estrelas
+        function createStars(){
+            const starsContainer=document.getElementById('stars');
+            for(let i=0;i<200;i++){
+                const star=document.createElement('div');
+                star.className='star';
+                star.style.left=Math.random()*100+'%';
+                star.style.top=Math.random()*100+'%';
+                star.style.animationDelay=Math.random()*3+'s';
+                starsContainer.appendChild(star);
+            }
+        }
+        createStars();
+
+        // Config
+        const METEOMATICS_API={
+            username:'hacktonappschalengenasa_parreira_luiz',
+            password:'5mqoG3kT8wXMF5Xk22ZB',
+            baseUrl:'https://api.meteomatics.com'
+        };
+
+        // Se estiver em desenvolvimento local, prefira o proxy para evitar CORS e esconder credenciais.
+        if(location.hostname==='localhost' || location.hostname==='127.0.0.1'){
+            METEOMATICS_API.baseUrl = 'http://localhost:3000/meteomatics';
+        }
+    const DATAGEO_WMS='https://datageo.ambiente.sp.gov.br/geoserver/datageo/wms';
+    const DATAGEO_WFS='https://datageo.ambiente.sp.gov.br/geoserver/datageo/ows';
+
+        const meteomaticsParams={
+            elevation_mm:{param:'elevation:m',title:'Elevação (m)'},
+            land_usage_mm:{param:'land_usage:idx',title:'Uso do Solo (Corine)'},
+            roughness_mm:{param:'roughness_length:m',title:'Elevação (m)'},
+            water_body_mm:{param:'is_open_water_body:idx',title:"Corpos d'Água"},
+            shadow_mm:{param:'is_in_shadow:idx',title:'Sombra Topográfica'}
+        };
+
+        // Checa disponibilidade da Meteomatics API e exibe badges se disponível
+        async function checkMeteomaticsAvailability(){
+            try{
+                const now=new Date().toISOString().split('.')[0]+'Z';
+                // usa um ponto no centro do mapa para teste
+                const lat=-23.5505, lon=-46.6333;
+                const sampleParam=Object.values(meteomaticsParams)[0]?.param;
+                if(!sampleParam) return false;
+                const url=`${METEOMATICS_API.baseUrl}/${now}/${sampleParam}/${lat},${lon}/json`;
+                const auth='Basic '+btoa(`${METEOMATICS_API.username}:${METEOMATICS_API.password}`);
+                const resp=await fetch(url,{method:'GET',headers:{'Authorization':auth}});
+                if(resp.ok){
+                    // mostra badges das camadas meteomatics
+                    document.querySelectorAll('.layer-item').forEach(item=>{
+                        const cb=item.querySelector('.layer-checkbox');
+                        const badge=item.querySelector('.info-badge');
+                        if(badge && cb && cb.dataset.source==='meteomatics'){
+                            badge.style.display='inline-block';
+                        }
+                    });
+                    return true;
+                }
+                else{
+                    console.warn('Meteomatics check returned',resp.status);
+                }
+            }catch(e){
+                console.warn('Meteomatics availability check failed:',e);
+                // possível CORS ou credenciais inválidas
+            }
+            return false;
+        }
+
+        // Mapa
+    const map=L.map('map').setView([-22.88125,-48.46069],10);
+        // Basemap: OpenStreetMap Standard
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+            attribution:'© OpenStreetMap contributors',
+            maxZoom:19
+        }).addTo(map);
+
+        // verifica disponibilidade da Meteomatics e mostra badges quando ok
+        checkMeteomaticsAvailability();
+
+        // Camadas WMS disponíveis
+        const layers={
+            balanco_hidrico:{name:'datageo:LLI_BALANCO_HIDRICO',title:'Balanço Hídrico'},
+            captacao_agua:{name:'datageo:CPT_CAPTACOES_SUPERFICIAIS',title:'Captações de Água'},
+            drenagem:{name:'datageo:LML_Hid_Trecho_Drenagem_25000',title:'Drenagem'},
+            unid_conservacao:{name:'datageo:UNIDADES_CONSERVACAO',title:'Unidades de Conservação'},
+            zona_municipal:{name:'datageo:ZONEAMENTO_MUNICIPIOS',title:'Zoneamento Municipal'},
+            zona_estadual:{name:'datageo:ZONEAMENTO_ECOLOGICO_ECONOMICO',title:'Zoneamento Estadual'},
+            zona_federal:{name:'datageo:TERRAS_INDIGENAS',title:'Terras Indígenas'}
+        };
+
+        // Estado
+        const activeLayers={}; // id -> Leaflet Layer (WMS tileLayer ou LayerGroup)
+        const legendPanel=document.getElementById('legendPanel');
+        const legendContent=document.getElementById('legendContent');
+
+        function showLoading(){document.getElementById('loadingIndicator').classList.add('active')}
+        function hideLoading(){document.getElementById('loadingIndicator').classList.remove('active')}
+
+        // Mensagem temporária no topo (reutilizável)
+        function showTempMessage(msg, timeout=3000){
+            const el=document.createElement('div');
+            el.className='temp-message';
+            el.style.position='absolute';el.style.left='50%';el.style.top='20px';el.style.transform='translateX(-50%)';
+            el.style.background='rgba(0,0,0,.85)';el.style.color='#ffa500';el.style.padding='8px 12px';el.style.borderRadius='8px';el.style.zIndex=3000;
+            el.style.fontFamily='Roboto,Arial,Helvetica,sans-serif';el.textContent=msg;document.body.appendChild(el);
+            setTimeout(()=>{ el.style.transition='opacity .4s'; el.style.opacity='0'; setTimeout(()=>el.remove(),450); },timeout);
+        }
+
+        // Indicador pequeno (verde/vermelho) que aparece brevemente ao aplicar filtro
+        function showApiIndicator(success, timeout=2000){
+            const id='api-indicator';
+            // remove indicador anterior se existir
+            const prev=document.getElementById(id); if(prev) prev.remove();
+            const el=document.createElement('div'); el.id=id;
+            el.style.position='absolute'; el.style.right='30px'; el.style.top='30px'; el.style.width='18px'; el.style.height='18px'; el.style.borderRadius='50%';
+            el.style.zIndex=4000; el.style.boxShadow='0 0 10px rgba(0,0,0,.4)';
+            el.style.background = success ? '#28a745' : '#dc3545';
+            el.style.border='2px solid rgba(255,255,255,.05)';
+            el.style.opacity='1'; el.style.transition='opacity .4s, transform .2s';
+            document.body.appendChild(el);
+            // some depois
+            setTimeout(()=>{ el.style.opacity='0'; el.style.transform='scale(.85)'; setTimeout(()=>el.remove(),450); }, timeout);
+        }
+
+        // Escala de cores simples para Meteomatics
+        function getColorForValue(value,layerId){
+            if(layerId==='elevation_mm'){
+                if(value<200) return '#0066cc';
+                if(value<400) return '#00cc66';
+                if(value<600) return '#ffff00';
+                if(value<800) return '#ff9900';
+                return '#ff0000';
+            }else if(layerId==='land_usage_mm'){
+                const corine=Math.floor(value/100);
+                const colors={1:'#e60000',2:'#ffff00',3:'#80ff00',4:'#00cc00',5:'#0066cc'};
+                return colors[corine]||'#808080';
+            }else if(layerId==='roughness_mm'){
+                if(value<0.01) return '#0000ff';
+                if(value<0.1) return '#00ffff';
+                if(value<0.5) return '#00ff00';
+                if(value<1.0) return '#ffff00';
+                return '#ff0000';
+            }else if(layerId==='water_body_mm'){
+                return value===1 ? '#0066cc' : '#808080';
+            }else if(layerId==='shadow_mm'){
+                return value===1 ? '#000000' : '#ffffff';
+            }
+            return '#ffa500';
+        }
+
+        // Extrai um valor numérico possível da resposta JSON da Meteomatics de forma robusta
+        function extractMeteomaticsValue(data){
+            try{
+                // Caso padrão: data.data[0].coordinates[0].dates[0].value
+                if(data && Array.isArray(data.data)){
+                    for(const entry of data.data){
+                        // cada entry pode ter coordinates
+                        if(entry && Array.isArray(entry.coordinates)){
+                            for(const coord of entry.coordinates){
+                                if(coord && Array.isArray(coord.dates)){
+                                    for(const d of coord.dates){
+                                        if(d && (typeof d.value !== 'undefined' && d.value !== null)){
+                                            // valor encontrado
+                                            return d.value;
+                                        }
+                                        // alguns endpoints retornam 'values' ou estruturas diferentes
+                                        if(d && typeof d === 'object'){
+                                            for(const k of ['value','values','val']){
+                                                if(typeof d[k] !== 'undefined' && d[k] !== null) return d[k];
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Alguns formatos colocam dates direto em entry.dates
+                        if(entry && Array.isArray(entry.dates)){
+                            for(const d of entry.dates){
+                                if(d && (typeof d.value !== 'undefined' && d.value !== null)) return d.value;
+                            }
+                        }
+                    }
+                }
+                // Como fallback, procura recursivamente o primeiro número encontrado no objeto
+                const seen = new Set();
+                function findNumber(obj){
+                    if(!obj || typeof obj !== 'object' || seen.has(obj)) return null;
+                    seen.add(obj);
+                    for(const k of Object.keys(obj)){
+                        const v = obj[k];
+                        if(typeof v === 'number') return v;
+                        if(Array.isArray(v)){
+                            for(const item of v){
+                                const r = (typeof item === 'number') ? item : (typeof item === 'object' ? findNumber(item) : null);
+                                if(r !== null) return r;
+                            }
+                        }else if(typeof v === 'object'){
+                            const r = findNumber(v);
+                            if(r !== null) return r;
+                        }
+                    }
+                    return null;
+                }
+                const fallback = findNumber(data);
+                return fallback;
+            }catch(e){
+                console.warn('Erro ao extrair valor Meteomatics',e);
+                return null;
+            }
+        }
+
+        // Legend helpers
+        function addWmsLegend(layerId){
+            const meta=layers[layerId];
+            if(!meta) return;
+            // GetLegendGraphic do GeoServer
+            const url=`${DATAGEO_WMS}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=${encodeURIComponent(meta.name)}&TRANSPARENT=true`;
+            const item=document.createElement('div');
+            item.className='legend-item';
+            item.id=`legend-${layerId}`;
+            item.innerHTML=`<div style="display:flex;flex-direction:column;gap:6px;width:100%">
+                <div><strong>${meta.title}</strong> <span class="small">WMS</span></div>
+                <img class="legend-img" alt="Legenda ${meta.title}" src="${url}"/>
+            </div>`;
+            legendContent.appendChild(item);
+        }
+
+        function addMeteomaticsLegend(layerId){
+            const meta=meteomaticsParams[layerId];
+            if(!meta) return;
+            const scheme={
+                elevation_mm:[
+                    {c:'#0066cc',t:'< 200 m'},
+                    {c:'#00cc66',t:'200–400 m'},
+                    {c:'#ffff00',t:'400–600 m'},
+                    {c:'#ff9900',t:'600–800 m'},
+                    {c:'#ff0000',t:'> 800 m'}
+                ],
+                land_usage_mm:[
+                    {c:'#e60000',t:'Áreas artificiais'},
+                    {c:'#ffff00',t:'Agrícola'},
+                    {c:'#80ff00',t:'Vegetação arbustiva'},
+                    {c:'#00cc00',t:'Florestas'},
+                    {c:'#0066cc',t:'Água'}
+                ],
+                roughness_mm:[
+                    {c:'#0000ff',t:'< 0.01 m'},
+                    {c:'#00ffff',t:'0.01–0.1 m'},
+                    {c:'#00ff00',t:'0.1–0.5 m'},
+                    {c:'#ffff00',t:'0.5–1.0 m'},
+                    {c:'#ff0000',t:'> 1.0 m'}
+                ],
+                water_body_mm:[
+                    {c:'#0066cc',t:'Água'},
+                    {c:'#808080',t:'Terra'}
+                ],
+                shadow_mm:[
+                    {c:'#000000',t:'Sombra'},
+                    {c:'#ffffff',t:'Iluminado'}
+                ]
+            }[layerId]||[];
+
+            const item=document.createElement('div');
+            item.className='legend-item';
+            item.id=`legend-${layerId}`;
+            item.style.flexDirection='column';
+            item.style.alignItems='stretch';
+            item.innerHTML=`<div><strong>${meta.title}</strong> <span class="small">API</span></div>`;
+            scheme.forEach(s=>{
+                const row=document.createElement('div');
+                row.className='legend-item';
+                row.innerHTML=`<span class="legend-color" style="background:${s.c}"></span><span>${s.t}</span>`;
+                item.appendChild(row);
+            });
+            legendContent.appendChild(item);
+        }
+
+        function removeLegend(layerId){
+            const el=document.getElementById(`legend-${layerId}`);
+            if(el) el.remove();
+            if(!legendContent.children.length){
+                const p=document.createElement('p');
+                p.style.opacity=.6;p.style.textAlign='center';
+                p.textContent='Ative camadas para ver as legendas';
+                legendContent.appendChild(p);
+            }
+        }
+
+        function ensureLegendContainer() {
+            // Limpa placeholder se a primeira legenda for adicionada
+            if(legendContent.children.length===1 && legendContent.querySelector('p')){
+                legendContent.innerHTML='';
+            }
+        }
+
+        // Adição/remoção de WMS
+        function addWMSLayer(layerId,opacity){
+            if(activeLayers[layerId]) map.removeLayer(activeLayers[layerId]);
+            const meta=layers[layerId];
+            const wms=L.tileLayer.wms(DATAGEO_WMS,{
+                layers:meta.name,
+                format:'image/png',
+                transparent:true,
+                opacity:opacity
+            }).addTo(map);
+            activeLayers[layerId]=wms;
+            ensureLegendContainer();
+            addWmsLegend(layerId);
+            // Se for Unidades de Conservação, também buscar geometria via WFS e desenhar como GeoJSON
+            if(layerId==='unid_conservacao'){
+                // busca e desenha; fitBounds apenas na primeira carga
+                fetchConservationUnits(true).catch(err=>console.warn('WFS fetch failed',err));
+            }
+        }
+        function removeLayer(layerId){
+            if(activeLayers[layerId]){
+                map.removeLayer(activeLayers[layerId]);
+                delete activeLayers[layerId];
+            }
+            // remove também a layer vetorial associada (se existir)
+            const vecId = `${layerId}_vector`;
+            if(activeLayers[vecId]){
+                map.removeLayer(activeLayers[vecId]);
+                delete activeLayers[vecId];
+            }
+            removeLegend(layerId);
+        }
+
+        // Busca Unidades de Conservação via WFS (bbox atual) e desenha como GeoJSON
+        async function fetchConservationUnits(fit=false){
+            const layerId='unid_conservacao';
+            const bounds=map.getBounds();
+            const sw=bounds.getSouthWest();
+            const ne=bounds.getNorthEast();
+            const bboxParam=`${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
+            const urlBbox=`${DATAGEO_WFS}?service=WFS&version=1.0.0&request=GetFeature&typeName=datageo:UNIDADES_CONSERVACAO&outputFormat=application/json&bbox=${bboxParam},EPSG:4326&maxFeatures=500`;
+            const urlAll=`${DATAGEO_WFS}?service=WFS&version=1.0.0&request=GetFeature&typeName=datageo:UNIDADES_CONSERVACAO&outputFormat=application/json&maxFeatures=2000`;
+            // feedback ao usuário
+            showLoading();
+            showTempMessage('Buscando Unidades de Conservação...',2500);
+            try{
+                let resp=await fetch(urlBbox,{method:'GET'});
+                if(!resp.ok){
+                    console.warn('WFS bbox returned',resp.status,'— tentando sem bbox');
+                }
+                let geojson = resp.ok ? await resp.json() : {features:[]};
+                // se não trouxe nada, tenta buscar sem bbox (fallback)
+                if(!geojson.features || !geojson.features.length){
+                    console.info('Nenhuma feição na bbox; tentando WFS sem bbox (fallback)');
+                    resp = await fetch(urlAll,{method:'GET'});
+                    if(resp.ok){
+                        geojson = await resp.json();
+                    }else{
+                        console.warn('WFS fallback returned',resp.status);
+                        geojson = {features:[]};
+                    }
+                }
+                // Remova layer anterior se houver
+                const vecId=`${layerId}_vector`;
+                if(activeLayers[vecId]){ map.removeLayer(activeLayers[vecId]); delete activeLayers[vecId]; }
+
+                const nameOf=(props)=> props?.nome || props?.NOME || props?.nm_unidade || props?.NM_UNIDADE || 'Unidade de Conservação';
+
+                const gj=L.geoJSON(geojson,{
+                    style: feature => ({color:'#00ff66',weight:2,fillColor:'#00ff66',fillOpacity:0.12}),
+                    onEachFeature: (feature,layer)=>{
+                        const p=feature.properties||{};
+                        layer.bindPopup(`<strong>${nameOf(p)}</strong><br/>`+Object.entries(p).map(([k,v])=>`<small>${k}: ${v}</small>`).join('<br/>'));
+                    }
+                });
+                gj.addTo(map);
+                activeLayers[vecId]=gj;
+                // se houver feições e fit=true, ajusta o mapa
+                if(fit && geojson.features && geojson.features.length){
+                    try{ map.fitBounds(gj.getBounds(),{maxZoom:13}); }catch(e){}
+                }else if(!geojson.features || !geojson.features.length){
+                    showTempMessage('Nenhuma Unidade de Conservação encontrada.',3000);
+                }
+                hideLoading();
+            }catch(e){
+                console.warn('Erro ao obter Unidades de Conservação via WFS',e);
+                showTempMessage('Erro ao buscar Unidades de Conservação. Veja console.',4000);
+                hideLoading();
+            }
+        }
+
+        // Meteomatics – amostragem por grade em torno do centro do mapa
+        async function addMeteomaticsLayer(layerId,opacity){
+            if(activeLayers[layerId]){ map.removeLayer(activeLayers[layerId]); delete activeLayers[layerId]; }
+            const config=meteomaticsParams[layerId];
+            if(!config) return;
+
+            showLoading();
+            try{
+                const center=map.getCenter();
+                const resolution=0.1; // ~11 km/0.1° lat; rascunho para visual
+                const points=[];
+                for(let latOffset=-0.3;latOffset<=0.3;latOffset+=resolution){
+                    for(let lonOffset=-0.3;lonOffset<=0.3;lonOffset+=resolution){
+                        points.push({lat:(center.lat+latOffset).toFixed(4),lon:(center.lng+lonOffset).toFixed(4)});
+                    }
+                }
+
+                const now=new Date().toISOString().split('.')[0]+'Z';
+                const results=[];
+                const maxPoints=Math.min(20,points.length); // limitar para não estourar cota
+                const auth='Basic '+btoa(`${METEOMATICS_API.username}:${METEOMATICS_API.password}`);
+                for(let i=0;i<maxPoints;i++){
+                    const p=points[i];
+                    const url=`${METEOMATICS_API.baseUrl}/${now}/${config.param}/${p.lat},${p.lon}/json`;
+                    try{
+                        const resp=await fetch(url,{method:'GET',headers:{'Authorization':auth}});
+                        if(resp.status===401 || resp.status===403){
+                            showTempMessage('Credenciais Meteomatics inválidas ou não autorizadas (401/403). Verifique o proxy/.env',6000);
+                            console.error('Meteomatics auth error',resp.status,url);
+                            // não seguir tentando para evitar flood
+                            break;
+                        }
+                        if(resp.status===429){
+                            showTempMessage('Limite de requisições Meteomatics atingido (429). Tente novamente mais tarde.',6000);
+                            console.warn('Rate limit from Meteomatics',url);
+                            break;
+                        }
+                        if(resp.ok){
+                            // tenta ler JSON — pode lançar se for HTML de erro
+                            let data;
+                            try{ data = await resp.json(); }catch(e){
+                                const txt = await resp.text().catch(()=>'<no body>');
+                                console.warn('Meteomatics returned non-JSON body',resp.status, txt, url);
+                                continue;
+                            }
+                            const v = extractMeteomaticsValue(data);
+                            if(typeof v!=='undefined' && v!==null){
+                                results.push({lat:parseFloat(p.lat),lon:parseFloat(p.lon),value:v});
+                            }else{
+                                console.log('Meteomatics: não foi possível extrair value para',config.param,'em',p, data);
+                            }
+                        }else{
+                            const text = await resp.text().catch(()=>'<no body>');
+                            console.warn('Meteomatics fetch failed',resp.status, text, url);
+                            showTempMessage(`Erro Meteomatics ${config.param}: ${resp.status}`,4000);
+                        }
+                    }catch(e){
+                        console.error('Erro de rede ao chamar Meteomatics',e, url);
+                        showTempMessage('Erro de rede ao acessar Meteomatics. Ver console.',4000);
+                    }
+                    if(i<maxPoints-1){ await new Promise(r=>setTimeout(r,100)); }
+                }
+
+                const group=L.layerGroup();
+                const success = results.length>0;
+                if(!success){
+                    showTempMessage('Nenhum dado retornado pela Meteomatics para esta área.',4000);
+                }
+                // indicador verde/vermelho que some
+                showApiIndicator(success, 2000);
+                results.forEach(pt=>{
+                    const color=getColorForValue(pt.value,layerId);
+                    const c=L.circleMarker([pt.lat,pt.lon],{
+                        radius:15,
+                        fillColor:color,
+                        color:color,
+                        weight:2,
+                        opacity:opacity,
+                        fillOpacity:Math.max(0.15,opacity*0.7)
+                    }).bindTooltip(`${meteomaticsParams[layerId].title}<br><strong>${pt.value}</strong>`,{sticky:true});
+                    group.addLayer(c);
+                });
+
+                group.addTo(map);
+                activeLayers[layerId]=group;
+                ensureLegendContainer();
+                addMeteomaticsLegend(layerId);
+            }finally{
+                hideLoading();
+            }
+        }
+
+        // Atualiza opacidade de uma camada já ativa
+        function updateLayerOpacity(layerId,opacity){
+            const lyr=activeLayers[layerId];
+            if(!lyr) return;
+            // WMS tileLayer tem setOpacity
+            if(lyr.setOpacity){
+                lyr.setOpacity(opacity);
+            }else if(lyr.eachLayer){
+                // LayerGroup de circleMarkers (Meteomatics)
+                lyr.eachLayer(l=>{
+                    if(l.setStyle){
+                        const s=l.options || {};
+                        l.setStyle({
+                            opacity:opacity,
+                            fillOpacity:Math.max(0.15,opacity*0.7),
+                            color:s.color,
+                            fillColor:s.fillColor
+                        });
+                    }
+                });
+            }
+        }
+
+        // UI – listeners
+        function pctToOpacity(val){ return Math.max(0,Math.min(1,Number(val)/100)); }
+
+        document.querySelectorAll('.layer-checkbox').forEach(cb=>{
+            cb.addEventListener('change',async (e)=>{
+                const id=e.target.dataset.layer;
+                const fromMeteo = e.target.dataset.source === 'meteomatics';
+                const slider=document.querySelector(`.layer-opacity[data-target="${id}"]`);
+                const opacity=slider?pctToOpacity(slider.value):0.7;
+
+                if(e.target.checked){
+                    if(fromMeteo){ await addMeteomaticsLayer(id,opacity); }
+                    else{ addWMSLayer(id,opacity); }
+                }else{
+                    removeLayer(id);
+                }
+            });
+        });
+
+        // sliders de opacidade removidos — não há listeners necessários
+
+        // Controles
+        function toggleLegend(){
+            legendPanel.classList.toggle('active');
+        }
+        window.toggleLegend=toggleLegend;
+
+        function resetView(){
+            map.setView([-22.88125,-48.46069],10);
+        }
+        window.resetView=resetView;
+
+        function clearAllLayers(){
+            Object.keys(activeLayers).forEach(id=>removeLayer(id));
+            // Desmarca checkboxes
+            document.querySelectorAll('.layer-checkbox').forEach(cb=>cb.checked=false);
+        }
+        window.clearAllLayers=clearAllLayers;
+
+        // Atualiza camadas Meteomatics ao mover o mapa (throttle simples)
+        let meteoRefreshTimer=null;
+        map.on('moveend',()=>{
+            if(meteoRefreshTimer) clearTimeout(meteoRefreshTimer);
+            meteoRefreshTimer=setTimeout(async ()=>{
+                const ids=Object.keys(activeLayers).filter(id=>meteomaticsParams[id]);
+                if(!ids.length) return;
+                // Recarrega cada uma com opacidade atual do slider
+                for(const id of ids){
+                    const slider=document.querySelector(`.layer-opacity[data-target="${id}"]`);
+                    const opacity=slider?pctToOpacity(slider.value):0.7;
+                    await addMeteomaticsLayer(id,opacity);
+                }
+                // Se Unidades de Conservação estiver ativa, recarrega vetor via WFS
+                if(activeLayers['unid_conservacao']){
+                    fetchConservationUnits(false).catch(e=>console.warn(e));
+                }
+            },400);
+        });
+
+        // === Ferramenta de consulta de elevação (SRTM) ===
+        let elevationToolActive = false;
+        let elevationClickHandler = null;
+
+        // Usa open-elevation como fallback público para SRTM-like elevation
+        async function fetchSRTMElevation(lat, lon){
+            // Exemplos de alternativas: NASA SRTM (requere credenciais), Google Elevation (API key), Open-Elevation (público, sem auth)
+            const openUrl = `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`;
+            try{
+                const resp = await fetch(openUrl);
+                if(!resp.ok){
+                    const text = await resp.text().catch(()=>'<no body>');
+                    throw new Error(`Open-Elevation HTTP ${resp.status}: ${text}`);
+                }
+                const data = await resp.json();
+                // Open-elevation: data.results[0].elevation
+                if(data && Array.isArray(data.results) && data.results[0] && typeof data.results[0].elevation === 'number'){
+                    return data.results[0].elevation;
+                }
+                throw new Error('Formato de resposta Open-Elevation inesperado: '+JSON.stringify(data).slice(0,200));
+            }catch(e){
+                console.warn('fetchSRTMElevation failed',e);
+                throw e;
+            }
+        }
+
+        function toggleElevationTool(){
+            elevationToolActive = !elevationToolActive;
+            const btn = document.getElementById('elevToggleBtn');
+            if(elevationToolActive){
+                btn.style.background = 'linear-gradient(135deg, rgba(40,167,69,.3), rgba(40,167,69,.15))';
+                btn.style.borderColor = '#28a745';
+                showTempMessage('Ferramenta de Elevação ativada — clique no mapa para consultar.',3000);
+                elevationClickHandler = async function(e){
+                    const {lat,lng} = e.latlng;
+                    try{
+                        showLoading();
+                        const elev = await fetchSRTMElevation(lat, lng);
+                        L.popup({maxWidth:300})
+                          .setLatLng([lat,lng])
+                          .setContent(`<strong>Elevação</strong><br/>Lat: ${lat.toFixed(5)}, Lon: ${lng.toFixed(5)}<br/><strong>${elev} m</strong>`)
+                          .openOn(map);
+                        showTempMessage(`Elevação: ${elev} m`,4000);
+                    }catch(err){
+                        showTempMessage('Erro ao obter elevação. Veja console.',4000);
+                    }finally{ hideLoading(); }
+                };
+                map.on('click', elevationClickHandler);
+            }else{
+                btn.style.background = '';
+                btn.style.borderColor = '#ffa500';
+                showTempMessage('Ferramenta de Elevação desativada.',1500);
+                if(elevationClickHandler) map.off('click', elevationClickHandler);
+                elevationClickHandler=null;
+            }
+        }
+
+        // === Geocodificador simples usando Nominatim (OpenStreetMap) ===
+        let searchMarker = null;
+        async function geocodeCity(query){
+            if(!query || !query.trim()) return [];
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=8`;
+            try{
+                const resp = await fetch(url, {headers:{'Accept':'application/json','User-Agent':'UrbanIA/1.0 (+https://example.com)'}});
+                if(!resp.ok) throw new Error('Nominatim HTTP '+resp.status);
+                const data = await resp.json();
+                return data; // array
+            }catch(e){
+                console.warn('Geocode failed',e);
+                showTempMessage('Erro na busca de cidade. Veja console.',3000);
+                return [];
+            }
+        }
+
+        function renderSearchResults(results){
+            const container=document.getElementById('searchResults');
+            container.innerHTML='';
+            if(!results || !results.length){
+                container.innerHTML='<div style="padding:8px;color:#ccc">Nenhum resultado</div>';
+                return;
+            }
+            results.forEach(r=>{
+                const el=document.createElement('div');
+                el.style.padding='8px'; el.style.borderBottom='1px solid rgba(255,140,0,.06)'; el.style.cursor='pointer';
+                el.innerHTML=`<strong style="display:block;color:#fff">${r.display_name.split(',')[0]}</strong><small style='opacity:.8'>${r.display_name}</small>`;
+                el.addEventListener('click',()=>{
+                    const lat=parseFloat(r.lat), lon=parseFloat(r.lon);
+                    map.setView([lat,lon], Math.max(10, r.boundingbox ? 12 : 12));
+                    if(searchMarker) map.removeLayer(searchMarker);
+                    searchMarker = L.marker([lat,lon]).addTo(map).bindPopup(r.display_name).openPopup();
+                    container.innerHTML='';
+                });
+                container.appendChild(el);
+            });
+        }
+
+        // UI hook
+        document.addEventListener('DOMContentLoaded', ()=>{
+            const btn=document.getElementById('citySearchBtn');
+            const input=document.getElementById('citySearchInput');
+            btn.addEventListener('click', async ()=>{
+                const q=input.value;
+                if(!q) return;
+                showLoading();
+                const res=await geocodeCity(q);
+                renderSearchResults(res);
+                hideLoading();
+            });
+            input.addEventListener('keydown', async (e)=>{
+                if(e.key==='Enter'){ e.preventDefault(); btn.click(); }
+            });
+        });
+
+    </script>
+</body>
+</html>
